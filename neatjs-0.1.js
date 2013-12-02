@@ -4,95 +4,76 @@
  *
  * @package NeatJS
  *
- * @version 0.1
+ * @version 0.2
  * @copyright 2013-2014, NeatJS
  *
  **/
+"use strict";
+var NeatID = 1;
 var NeatJS = (function () {
+
+    function NeatJS(elementSelector) {
+        this.NeatID = NeatID++;
+        return this.$(elementSelector);
+    }
 
     var magicElementsMethods = [
         'toggleClass',
         'addClass',
         'removeClass',
         'hasClass',
-        'text'
+        'text',
+        'attr',
+        'data',
+        'addEventListener'
     ];
+    for(var i= 0, l=magicElementsMethods.length; i<l; i++) {
+        var method = magicElementsMethods[i];
+        NeatJS.prototype[method] = function(fn) {
+            return function() {
+                var params = Array.prototype.slice.call(arguments, 0);
+                return this._callElementFunction(fn, params);
+            }
+        }(magicElementsMethods[i]);
+    }
 
-    var magicListenersMethods = [
-        'click',
-        'change'
-    ];
-
-    function NeatJS(elementSelector) {
+    NeatJS.prototype.$ = function(elementSelector) {
         if (!elementSelector) return null;
+
+        var context =  this._element || document;
+        this._elements = [];
         if (elementSelector instanceof Element) {
             this._elements = [elementSelector];
-        } else if (typeof elementSelector == 'string') {
-            if (elementSelector[0] == '#') {
-                this._elements = [document.getElementById(elementSelector.substr(1))];
-            } else if (elementSelector[0] == '.') {
-                this._elements = document.getElementsByClassName(elementSelector.substr(1).replace('.', ' '));
+        } else if (typeof elementSelector === 'string') {
+            if (elementSelector[0] === '#') {
+                this._elements = [context.getElementById(elementSelector.substr(1))];
+            } else if (elementSelector[0] === '.') {
+                var tmp = context.getElementsByClassName(elementSelector.substr(1).replace('.', ' '));
+                for (var ti = 0; ti < tmp.length; ti++) {
+                    this._elements.push(tmp[ti]);
+                }
+                ti = null;
+                tmp = null;
             } else {
-                this._elements = document.getElementsByTagName(elementSelector);
+                this._elements = context.getElementsByTagName(elementSelector);
             }
         }
         this._element = this._elements[0];
-        for(var i= 0, l=magicElementsMethods.length; i<l; i++) {
-            var method = magicElementsMethods[i];
-            NeatJS.prototype[magicElementsMethods[i]] = function(fn) {
-                return function(params) {
-                    for(var j= 0, n = this._elements.length; j < n; j++) {
-                        this._elements[j][fn](params);
-                    }
-                    return this;
-                }
-            }(method);
-        }
-
-    }
-
-    NeatJS.prototype.callElementFunction = function(fn, params) {
-        for(var j= 0, n = this._elements.length; j < n; j++) {
-            this._elements[j][fn](params);
-        }
         return this;
     }
-    NeatJS.prototype.addEventListener = function(eventName, callback) {
-        for(var j= 0, n = this._elements.length; j < n; j++) {
-            this._elements[j].addEventListener(eventName, callback);
-        }
-    }
 
+    NeatJS.prototype._callElementFunction = function(fn, params) {
+        var res = [];
+        for(var j= 0, n = this._elements.length; j < n; j++) {
+            res.push(this._elements[j][fn].apply(this._elements[j], params));
+        }
+        return (res.length == 1)  ? (res[0] instanceof Element ? this : res[0]) : this;
+    }
     NeatJS.prototype.click = function(callback) {
         for(var i= 0, l = this._elements.length; i < l; i++) {
             this._elements[i].addEventListener('click', callback);
         }
         return this;
-    }
-    NeatJS.prototype.attr = function(attributeName, value) {
-        if (!this._element) return null;
-
-        attributeName = attributeName.toLowerCase();
-
-        if (value) {
-            if (this._element.setAttribute) {
-                this._element.setAttribute(attributeName, value);
-            } else {
-                this._element[attributeName] = value;
-            }
-        }
-        var val;
-
-        // Set document vars if needed
-        if ( ( this._element.ownerDocument || this._element ) !== document ) {
-            alert('Need to use http://sizzlejs.com :)');
-        }
-        return ( (val = this._element.getAttributeNode( attributeName ))
-            || this._element.getAttribute( attributeName ) ) && this._element[ attributeName ] === true ?
-            attributeName : val && val.specified ? val.value : null;
-    }
-    NeatJS.prototype.data = function(attributeDataName, value) {
-        return this.attr('data-' + attributeDataName, value);
     }
     NeatJS.prototype.append = function(element) {
         this._element.appendChild(element instanceof NeatJS ? element.getElement() : element);
@@ -109,21 +90,15 @@ var NeatJS = (function () {
     NeatJS.prototype.getElement = function() {
         return this._element;
     }
+
     NeatJS.prototype.getParent = function() {
         var parent = this._element.parentNode;
         return parent && parent.nodeType !== 11 ? parent : null;
     }
 
-    NeatJS.prototype.log = function() {
-        if (this._elements.length == 1) {
-            return this._element;
-        } else {
-            return this._elements;
-        }
-    }
-
     return NeatJS;
 })();
+
 
 if (!Element.prototype.toggleClass) {
     Element.prototype.toggleClass = function(className) {
@@ -133,24 +108,54 @@ if (!Element.prototype.toggleClass) {
         } else {
             this.className += ' ' + className;
         }
+        return this;
     }
     Element.prototype.addClass = function(className) {
         var currentClassName = this.className;
         if (currentClassName.indexOf(className) === -1) {
             this.className += ' ' + className;
         }
+        return this;
     }
     Element.prototype.removeClass = function(className) {
         var currentClassName = this.className;
         if (currentClassName.indexOf(className) !== -1) {
-            this.className = currentClassName.replace(className, '').trim();
+            currentClassName = currentClassName.replace(className, '').trim();
         }
+        this.className = currentClassName;
+        return this;
     }
     Element.prototype.hasClass = function(className) {
         return (this.className.indexOf(className) !== -1);
     }
     Element.prototype.text = function(text) {
         return (this.innerText = text);
+    }
+    Element.prototype.attr = function(attributeName, value) {
+        attributeName = attributeName.toLowerCase();
+
+        if (value) {
+            if (this.setAttribute) {
+                this.setAttribute(attributeName, value);
+            } else {
+                this[attributeName] = value;
+            }
+        }
+        // Set document vars if needed
+        if ( ( this.ownerDocument || this ) !== document ) {
+            alert('Need to use http://sizzlejs.com :)');
+        }
+        var val;
+        var res = ((val = this.getAttributeNode( attributeName ))
+            || this.getAttribute( attributeName ) ) && this[ attributeName ] === true ?
+            attributeName : val && val.specified ? val.value : null;
+
+
+        return value ? this : res;
+
+    }
+    Element.prototype.data = function(attributeDataName, value) {
+        return this.attr('data-' + attributeDataName, value);
     }
 }
 
