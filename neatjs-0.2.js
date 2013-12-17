@@ -25,6 +25,7 @@ var NeatJS = (function () {
         'text',
         'attr',
         'data',
+        'html',
         'addEventListener'
     ];
     for(var i= 0, l=magicElementsMethods.length; i<l; i++) {
@@ -83,6 +84,12 @@ var NeatJS = (function () {
         element.insertBefore(this._element.firstChild);
         return this;
     }
+    NeatJS.prototype.remove = function() {
+        while (this._elements.length) {
+            this._elements[0].remove();
+        }
+        return this;
+    }
     NeatJS.prototype.dispose = function() {
         this._element.parentNode.removeChild(this._element);
         return this;
@@ -90,7 +97,9 @@ var NeatJS = (function () {
     NeatJS.prototype.getElement = function() {
         return this._element;
     }
-
+    NeatJS.prototype.length = function() {
+        return this._elements.length;
+    };
     NeatJS.prototype.getParent = function() {
         var parent = this._element.parentNode;
         return parent && parent.nodeType !== 11 ? parent : null;
@@ -130,6 +139,9 @@ if (!Element.prototype.toggleClass) {
     }
     Element.prototype.text = function(text) {
         return (this.innerText = text);
+    }
+    Element.prototype.html = function(html) {
+        return (this.innerHTML = html);
     }
     Element.prototype.attr = function(attributeName, value) {
         attributeName = attributeName.toLowerCase();
@@ -178,4 +190,33 @@ String.prototype.rtrim=function(){return this.replace(/\s+$/,'');};
 
 window.$ = function(selector) {
     return new NeatJS(selector);
+}
+window.$.request = function (options) {
+
+    var _options = {
+        'method'    : 'POST',
+        'url'       : '/',
+        'query'     : '',
+        'success'   : null
+    };
+
+    if (options) {
+        for(var i in options) {
+            if (_options[i] !== undefined) {
+                _options[i] = options[i];
+            }
+        }
+    }
+
+    var r = new XMLHttpRequest();
+    r.open(_options.method, _options.url, true);
+
+    r.onreadystatechange = function () {
+        if (r.readyState != 4 || r.status != 200) return;
+        if (_options.success) {
+            _options.success(r.responseText);
+        }
+    };
+    r.send(_options.query);
+
 }
